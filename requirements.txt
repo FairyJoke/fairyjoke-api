@@ -1,0 +1,8 @@
+FastAPI
+jinja2
+SQLAlchemy
+uvicorn
+setuptools_scm
+toml
+pyyaml
+git+https://github.com/Tina-otoge/default-sqlalchemy-setup
