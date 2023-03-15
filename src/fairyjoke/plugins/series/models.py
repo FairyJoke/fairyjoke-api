@@ -2,15 +2,13 @@ import sqlalchemy as sa
 
 from fairyjoke import Plugin
 
-db = Plugin.db
 
-"""
-class SeriesGroup(Plugin.db.Base):
+class SeriesGroup(Plugin.Table):
     id = sa.Column(sa.String, primary_key=True)
     name = sa.Column(sa.String)
 
 
-class Series(Plugin.db.Base):
+class Series(Plugin.Table):
     id = sa.Column(sa.String, primary_key=True)
     name = sa.Column(sa.String)
     translation = sa.Column(sa.String)
@@ -20,7 +18,7 @@ class Series(Plugin.db.Base):
     group = sa.orm.relationship("SeriesGroup", backref="series")
 
 
-class SeriesGame(Plugin.db.Base):
+class SeriesGame(Plugin.Table):
     id = sa.Column(sa.String, primary_key=True)
     series_id = sa.Column(
         sa.ForeignKey("series.id"), primary_key=True, nullable=False
@@ -29,4 +27,3 @@ class SeriesGame(Plugin.db.Base):
     date = sa.Column(sa.String)
 
     series = sa.orm.relationship("Series", backref="series")
-"""
