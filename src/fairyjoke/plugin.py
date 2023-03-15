@@ -19,13 +19,16 @@ class Plugin:
         self.all[self.id] = self
 
     def init(self):
+        # We access the "models" submodule to trigger the creation of the
+        # tables
         models_module_str = f"{self.id}.models"
         try:
             importlib.import_module(models_module_str)
         except ModuleNotFoundError as e:
             if e.name != models_module_str:
                 raise e
-
+        # If "Plugin.db" was accessed at least once, it should mean that tables
+        # are defined, we then actually create them in the database
         if self._db:
             self.db.init()
 
