@@ -1,29 +1,30 @@
-import sqlalchemy as sa
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped as Column
+from sqlalchemy.orm import mapped_column as column
+from sqlalchemy.orm import relationship
 
 from fairyjoke import Plugin
 
 
-class SeriesGroup(Plugin.Table):
-    id = sa.Column(sa.String, primary_key=True)
-    name = sa.Column(sa.String)
+class Group(Plugin.Table):
+    id: Column[str] = column(primary_key=True)
+    name: Column[str]
 
 
 class Series(Plugin.Table):
-    id = sa.Column(sa.String, primary_key=True)
-    name = sa.Column(sa.String)
-    translation = sa.Column(sa.String)
-    active = sa.Column(sa.Boolean, default=True)
-    group_id = sa.Column(sa.ForeignKey("series_groups.id"))
+    id: Column[str] = column(primary_key=True)
+    name: Column[str]
+    translation: Column[str] = column(nullable=True)
+    active: Column[bool] = True
+    group_id: Column[int] = column(ForeignKey("groups.id"), nullable=True)
 
-    group = sa.orm.relationship("SeriesGroup", backref="series")
+    group: Column[Group] = relationship("Group", backref="series")
 
 
-class SeriesGame(Plugin.Table):
-    id = sa.Column(sa.String, primary_key=True)
-    series_id = sa.Column(
-        sa.ForeignKey("series.id"), primary_key=True, nullable=False
-    )
-    name = sa.Column(sa.String)
-    date = sa.Column(sa.String)
+class Game(Plugin.Table):
+    id: Column[str] = column(primary_key=True)
+    series_id: Column[str] = column(ForeignKey("series.id"))
+    name: Column[str]
+    date: Column[str]
 
-    series = sa.orm.relationship("Series", backref="series")
+    series: Column[Series] = relationship("Series", backref="series")
