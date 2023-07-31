@@ -1,0 +1,7 @@
+fastapi
+Jinja2
+SQLAlchemy
+uvicorn
+setuptools_scm
+toml
+pyyaml
