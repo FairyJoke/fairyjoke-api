@@ -25,6 +25,6 @@ class Game(Plugin.Table):
     id: Column[str] = column(primary_key=True)
     series_id: Column[str] = column(ForeignKey("series.id"))
     name: Column[str]
-    date: Column[str]
+    date: Column[str] = column(nullable=True)
 
     series: Column[Series] = relationship("Series", backref="series")

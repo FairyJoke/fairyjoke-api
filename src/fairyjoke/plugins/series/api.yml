@@ -1,0 +1,24 @@
+objects:
+  series:
+    keys:
+      id: str
+    fields:
+      name: str
+      translation: str
+      active: bool
+
+  game:
+    keys:
+      series_id: str
+      id: str
+    links:
+      series_id: series.id
+    fields:
+      name: str
+      date: date
+
+  group:
+    keys:
+      id: str
+    fields:
+      name: str

@@ -1,11 +1,6 @@
-import sqlalchemy as sa
 from pydantic import BaseModel
 
 from fairyjoke import Plugin
-
-from .models import Game
-
-router = Plugin.Router()
 
 
 class Schema(BaseModel):
@@ -49,47 +44,15 @@ class Schema(BaseModel):
 
     def __init_subclass__(cls):
         super().__init_subclass__()
+        cls.router = Plugin.Router()
 
-        router.add_api_route(
+        cls.router.add_api_route(
             f"{cls._route_name}/",
             cls.get_all,
             name=f"Get all {cls._table.__name__}",
         )
-        router.add_api_route(
+        cls.router.add_api_route(
             f"{cls._route_name}/{{id}}",
             cls.get_one,
             name=f"Get one {cls._table.__name__} by ID",
         )
-
-
-class SeriesSchema(Schema):
-    __url__ = ""
-    id: str
-    name: str
-    translation: str = None
-
-
-class GameSchema(Schema):
-    __url__ = "/{series_id}/games"
-    id: str
-    series_id: str
-    name: str
-    date: str = None
-
-    @classmethod
-    def get_all(cls, series_id):
-        with Plugin.Session() as s:
-            statement = sa.select(cls._table).where(
-                cls._table.series_id == series_id
-            )
-            return s.execute(statement).scalars().all()
-
-    @classmethod
-    def get_one(cls, series_id, id):
-        with Plugin.Session() as s:
-            return s.get(cls._table, (series_id, id))
-
-
-class GroupSchema(Schema):
-    id: str
-    name: str

@@ -1,0 +1,4 @@
+objects:
+  song:
+    game_id: str
+    

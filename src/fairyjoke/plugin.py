@@ -125,3 +125,10 @@ class Plugin:
         Plugin.current for how the current plugin is resolved
         """
         return cls.Database.session
+
+    @classmethod
+    @property
+    def Schema(cls):
+        from .schema import Schema
+
+        return Schema

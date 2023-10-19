@@ -60,7 +60,6 @@ def main():
         if plugin.api_router:
             api_router.include_router(plugin.api_router)
     app.include_router(api_router)
-    logging.debug("Hello")
 
 
 main()
