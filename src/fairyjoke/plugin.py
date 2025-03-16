@@ -1,127 +1,112 @@
+import dataclasses
 import importlib
 import inspect
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import APIRouter
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, declared_attr, sessionmaker
 
-from fairyjoke import VAR_PATH
-from fairyjoke.db import Database
+from fairyjoke import FAIRYJOKE_PATH, VAR_PATH, app, log
+from fairyjoke.data import Data
 
 
+@dataclass
 class Plugin:
-    all = {}
 
-    def __init__(self, path: Path | str):
-        self.id = self.idify(path)
-        self.name = self.id.split(".")[-1]
-        self.module = importlib.import_module(self.id)
-        self._db = None
-        print("Found plugin module", self)
-        self.all[self.id] = self
-        self.api_router = None
-        self.frontend_router = None
+    path: Path
+    id: str = None
+    router: APIRouter = dataclasses.field(default_factory=APIRouter)
 
     def __str__(self):
-        return self.id
+        return f"<{self.__class__.__name__} {self.id}>"
+
+    def __post_init__(self):
+        if not self.id:
+            self.id = self.path.name
+        if not getattr(app, "plugins", None):
+            app.plugins = {}
+        if self.id in app.plugins:
+            raise ValueError(f"Plugin with id {self.id} already exists")
+        self.data = Data(self.path / "data")
+        app.plugins[self.id] = self
+        self.tables = {}
+
+    def load(self, module):
+        for subpath in (f"{module}.py", module):
+            if (self.path / subpath).exists():
+                module_str = ".".join(self.path.parts) + f".{module}"
+                return importlib.import_module(module_str)
 
     def init(self):
-        def load(module, attribute=None):
-            module_str = f"{self.id}.{module}"
-            try:
-                imported = importlib.import_module(module_str)
-                if attribute and hasattr(imported, attribute):
-                    return getattr(imported, attribute)
-                return imported
-            except ModuleNotFoundError as e:
-                if e.name != module_str:
-                    raise e
-                return None
-
-        # We access the "models" submodule to trigger the creation of the
-        # tables
-        load("models")
-        # If "Plugin.db" was accessed at least once, it should mean that tables
-        # are defined, we then actually create them in the database
-        if self._db:
-            self.db.init()
-
-        self.api_router = load("api", "router")
-        self.frontend_router = load("frontend", "router")
-
-    @property
-    def db(self):
-        if self._db:
-            return self._db
-        filename = f"plugin_{self.name}"
-        db = Database(f"sqlite:///{VAR_PATH / filename}.sqlite", plugin=self)
-        self._db = db
-        return db
+        module = self.load("init")
+        if module:
+            log.info(f"Running init for {self}")
+            module.main()
+        else:
+            log.debug(f"No init for {self}")
 
     @classmethod
-    def get(cls, path: Path):
-        id = cls.idify(path)
-        return cls.all.get(id) or cls(path)
-
-    @staticmethod
-    def idify(path: Path):
-        """Converts / to . relative to current directory
-        >>> Plugin.idify(Path("plugins/sdvx"))
-        'plugins.sdvx'
-        """
-        if isinstance(path, str):
-            path = Path(path)
-        if path.is_absolute():
-            path = path.relative_to(Path.cwd())
-        if path.name == "__init__.py":
-            path = path.parent
-        return ".".join(path.parts)
+    def from_path(cls, path: Path) -> "Plugin":
+        result = cls(path=path)
+        return result
 
     @classmethod
-    @property
-    def current(cls) -> "Plugin":
-        """
-        Resolves to the plugin that called this function, by looking at last
-        occurence of a plugin in the stack trace
-        """
-        for frame in inspect.stack():
-            if frame.filename.startswith("<"):
-                continue
-            path = Path(frame.filename)
-            if not path.is_relative_to(Path.cwd()):
-                continue
-            path = path.relative_to(Path.cwd())
-            id = cls.idify(path)
-            for plugin in cls.all:
-                if id.startswith(plugin):
-                    return cls.all[plugin]
+    def Router(cls) -> APIRouter:
+        return cls.get_caller_plugin().router
 
     @classmethod
-    @property
-    def Database(cls) -> Database:
-        """
-        Returns the Database object of the current plugin, see
-        Plugin.current for how the current plugin is resolved
-        """
-        return cls.current.db
+    def Data(cls) -> Data:
+        return cls.get_caller_plugin().data
 
     @classmethod
-    @property
     def Table(cls):
-        """
-        Returns the Base object of the current plugin database, see
-        Plugin.current for how the current plugin is resolved
-        """
-        return cls.Database.Base
+        plugin = cls.get_caller_plugin()
+        db_path = VAR_PATH / plugin.id / "db.sqlite"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        engine = create_engine(f"sqlite:///{db_path}")
+
+        class Base(DeclarativeBase):
+            __allow_unmapped__ = True
+
+            @declared_attr.directive
+            def __tablename__(cls):
+                return cls.__name__.lower()
+
+            def __init_subclass__(cls, **kwargs):
+                super().__init_subclass__(**kwargs)
+                cls.metadata.create_all(engine)
+                plugin.tables[cls.__name__] = cls
+
+            @classmethod
+            def Session(cls):
+                return sessionmaker(bind=engine)()
+
+        return Base
 
     @classmethod
-    def Router(cls):
-        return APIRouter(prefix=f"/{cls.current.name}")
+    def get_caller_plugin(cls):
+        # check for plugins/<plugin_id> in stack and return the corresponding
+        # Plugin instance
+        for frame in inspect.stack():
+            parts = frame.filename.split("/")
+            if "plugins" in parts:
+                plugin_path = Path(
+                    "/".join(parts[: parts.index("plugins") + 2])
+                )
+                plugin_id = plugin_path.name
+                return app.plugins.get(plugin_id)
+        raise ValueError("No plugin found in stack")
 
-    @classmethod
-    @property
-    def Session(cls):
-        """
-        Returns the Session object of the current plugin database, see
-        Plugin.current for how the current plugin is resolved
-        """
-        return cls.Database.session
+
+def load_plugins() -> list[Plugin]:
+    result = []
+    for plugin_base_dir in ((FAIRYJOKE_PATH / "plugins"), Path("plugins")):
+        for plugin_path in plugin_base_dir.glob("*/"):
+            plugin = Plugin.from_path(plugin_path)
+            result.append(plugin)
+    for plugin in result:
+        plugin.load("routes")
+        plugin.load("db")
+    return result
