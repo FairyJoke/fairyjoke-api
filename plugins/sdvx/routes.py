@@ -1,4 +1,4 @@
-from fairyjoke.plugin import Plugin
+from fairyjoke import Plugin
 
 from .db import Music
 

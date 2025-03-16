@@ -1,6 +1,6 @@
 from sqlalchemy.orm import mapped_column
 
-from fairyjoke.plugin import Plugin
+from fairyjoke import Plugin
 
 
 class Music(Plugin.Table()):

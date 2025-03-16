@@ -39,6 +39,9 @@ def create_app():
     log.info(f"Starting {APP_NAME} v{__version__}")
     plugins = plugin.load_plugins()
     for p in plugins:
-        print(p, p.router.routes)
+        print(p, [x.path for x in p.router.routes])
         app.include_router(p.router, prefix=f"/{p.id}")
     return app
+
+
+from .plugin import Plugin  # noqa

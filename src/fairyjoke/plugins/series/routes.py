@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from fairyjoke.plugin import Plugin
+from fairyjoke import Plugin
 
 
 class Series(BaseModel):

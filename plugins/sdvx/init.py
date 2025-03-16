@@ -1,5 +1,4 @@
-from fairyjoke import log
-from fairyjoke.plugin import Plugin
+from fairyjoke import Plugin, log
 
 from .db import Music
 
