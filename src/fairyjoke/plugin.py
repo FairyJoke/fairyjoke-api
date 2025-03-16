@@ -6,7 +6,9 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, declared_attr, sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import Session as Session_
+from sqlalchemy.orm import declared_attr
 
 from fairyjoke import FAIRYJOKE_PATH, VAR_PATH, app, log
 from fairyjoke.data import Data
@@ -31,7 +33,23 @@ class Plugin:
             raise ValueError(f"Plugin with id {self.id} already exists")
         self.data = Data(self.path / "data")
         app.plugins[self.id] = self
-        self.tables = {}
+
+        db_path = VAR_PATH / self.id / "db.sqlite"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.engine = create_engine(f"sqlite:///{db_path}")
+
+        class Base(DeclarativeBase):
+            __allow_unmapped__ = True
+
+            @declared_attr.directive
+            def __tablename__(cls):
+                return cls.__name__.lower()
+
+            def __init_subclass__(cls, **kwargs):
+                super().__init_subclass__(**kwargs)
+                cls.metadata.create_all(self.engine)
+
+        self.Base = Base
 
     def load(self, module):
         for subpath in (f"{module}.py", module):
@@ -61,29 +79,30 @@ class Plugin:
         return cls.get_caller_plugin().data
 
     @classmethod
+    def Session(cls):
+        class CustomSession(Session_):
+            def upsert(self, table, data, **matchers):
+                data |= matchers
+                obj = self.query(table).filter_by(**matchers).first()
+                if not obj:
+                    obj = table(**data)
+                    log.info(f"Created {obj}")
+                    self.add(obj)
+                    return obj
+                for key, value in data.items():
+                    current = getattr(obj, key)
+                    if current != value:
+                        setattr(obj, key, value)
+                        log.info(
+                            f"Updating {obj}: {key} = {current} -> {value}"
+                        )
+                return obj
+
+        return CustomSession(cls.get_caller_plugin().engine)
+
+    @classmethod
     def Table(cls):
-        plugin = cls.get_caller_plugin()
-        db_path = VAR_PATH / plugin.id / "db.sqlite"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        engine = create_engine(f"sqlite:///{db_path}")
-
-        class Base(DeclarativeBase):
-            __allow_unmapped__ = True
-
-            @declared_attr.directive
-            def __tablename__(cls):
-                return cls.__name__.lower()
-
-            def __init_subclass__(cls, **kwargs):
-                super().__init_subclass__(**kwargs)
-                cls.metadata.create_all(engine)
-                plugin.tables[cls.__name__] = cls
-
-            @classmethod
-            def Session(cls):
-                return sessionmaker(bind=engine)()
-
-        return Base
+        return cls.get_caller_plugin().Base
 
     @classmethod
     def get_caller_plugin(cls):

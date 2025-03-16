@@ -3,9 +3,32 @@ import importlib
 import json
 import xml.etree.ElementTree as ET
 from configparser import ConfigParser
+from pathlib import Path
 
 import toml
 import yaml
+
+
+class Element(ET.Element):
+    @property
+    def value(self):
+        coerce = str
+        if type := self.get("__type"):
+            if type[0] in ("s", "u"):
+                coerce = int
+        return coerce(self.text)
+
+    def parse(self, accessor):
+        return self.find(accessor).value
+
+    def parse_all(self, **accessors):
+        return {k: self.parse(v) for k, v in accessors.items()}
+
+    def __str__(self):
+        return self.value
+
+
+tree_builder = ET.TreeBuilder(element_factory=Element)
 
 
 class Data:
@@ -20,8 +43,13 @@ class Data:
 
     @functools.cache
     def load(self, name):
-        path = self.path.glob(name + ".*")
-        path = next(path, None)
+        if isinstance(name, str):
+            path = self.path.glob(name + ".*")
+            path = next(path, None)
+        elif isinstance(name, Path):
+            path = name
+        else:
+            raise ValueError(f"Invalid name type: {name}")
         if not path:
             raise FileNotFoundError(f"File not found: {name}")
         if not path.exists():
@@ -41,5 +69,7 @@ class Data:
             return module.main()
         if path.suffix == ".xml":
             with path.open(encoding="cp932", errors="ignore") as f:
-                return ET.fromstring(f.read())
+                return ET.fromstring(
+                    f.read(), parser=ET.XMLParser(target=tree_builder)
+                )
         raise ValueError(f"Unknown file type: {path}")
