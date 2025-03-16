@@ -23,37 +23,6 @@ obtained from wiki websites. This either requires parsing the game files, or the
 official application / website of the game, which in some cases expose this
 information.
 
-For some data such as a list of games and their release dates, I'm envisionning
-a folder with text files that users could contribute to easily on GitHub, see
-the
-[`import/games` folder in the 1.0 branch of the legacy repository](https://github.com/Tina-otoge/FairyJokeAPI/tree/1.0/imports/games)
-for an example.
-
-## Features and plans
-
-- **Plugins system**. The goal is for the project to be as modular as
-  possible. To ease development and contributions, each "thing" stored in the
-  database as to be implemented in its own plugin. Plugins should be
-  responsible for their own database objects, API routes, and web UI.
-
-- **Easy to browse API**. The API should be verbose enough to be explored from
-  the /api/ endpoint then following the different routes, without having to read
-  an external documentation.
-
-### Games related
-
-- **Relating metadata together**. It should be possible to get the list of games
-  a song was released in, songs produced by an artist even with multiple
-  aliases, etc.
-  Theorical API browsing scenario, prefix specifies the plugin module
-  responsible for the API route used:
-  1. [IIDX] List IIDX 28 songs
-  2. [IIDX/Songs] Get info on: *smooooch・∀・ (Snail's House Remix)*
-  3. [Core/Songs] Access "related songs" field: "Is a remix of: *smooooch・∀・*"
-  4. [Core/Songs] Fetch artist of song, get: *kors k*
-
-- **Getting static assets**: jackets, profile pictures.
-
 ## Zoom on features
 
 ### Plugins
@@ -65,7 +34,7 @@ plugin called "Series", which creates the "Game", "Series", "Release", objects
 in the database and their relations. External plugins, such as the "SOUND
 VOLTEX" plugin, are stored directly in the `plugins` folder in the working
 directory. These plugins can depend on internal plugins such as the "Series"
-one.
+one. However the app should not depend on these plugins.
 
 Plugins can handle the following things:
 
@@ -78,7 +47,8 @@ Plugins can handle the following things:
 
 When starting the application, even with plugins installed, no data should be
 created in the database. To populate the database, the "init" entrypoint should
-be called. As this data can become very big, initializing only once ensures a short start time for the application. The init entrypoint will run the init
+be called. As this data can become very big, initializing only once ensures a
+short start time for the application. The init entrypoint will run the init
 scripts of every plugins. These scripts should limit themselves to loading
 static data from the `data` folders.
 
@@ -87,9 +57,6 @@ files, official websites, trustable wikis, or other sources, and generate the
 YAML/JSON to be then used by the init scripts. Seperating this process from the
 init scripts avoids repetitively executing these expensive actions, especially
 if they imply scraping existing websites.
-
-It is yet to be decided if those scripts should be part of the FairyJoke
-repository, or if they should be public at all.
 
 Once the init scripts are run and the databases are populated, the application
 can start and will load data directly from the database, allowing for efficient
@@ -130,7 +97,7 @@ FairyJoke, that you could check out too:
 - https://ddr.stepcharts.com/
 - https://sdvx.in/
 - https://zenius-i-vanisher.com/
-- [Tachi](https://github.com/TNG-dev/Tachi/)
+- https://github.com/TNG-dev/Tachi/
 
 Notable official resources:
 
